@@ -54,6 +54,7 @@ static int pick_next_hook(struct child_process *cp,
 		return 0;
 
 	strvec_pushv(&cp->env_array, hook_cb->options->env.v);
+	cp->stdout_to_stderr = 1; /* because of .ungroup = 1 */
 	cp->trace2_hook_name = hook_cb->hook_name;
 	cp->dir = hook_cb->options->dir;
 
@@ -126,6 +127,7 @@ int run_hooks_opt(const char *hook_name, struct run_hooks_opt *options)
 		.tr2_label = hook_name,
 
 		.jobs = jobs,
+		.ungroup = jobs == 1,
 
 		.get_next_task = pick_next_hook,
 		.start_failure = notify_start_failure,
@@ -135,6 +137,9 @@ int run_hooks_opt(const char *hook_name, struct run_hooks_opt *options)
 
 	if (!options)
 		BUG("a struct run_hooks_opt must be provided to run_hooks");
+
+	if (jobs != 1 || !run_opts.ungroup)
+		BUG("TODO: think about & document order & interleaving of parallel hook output");
 
 	if (options->invoked_hook)
 		*options->invoked_hook = 0;
