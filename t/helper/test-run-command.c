@@ -142,6 +142,12 @@ static int testsuite(int argc, const char **argv)
 			 "write JUnit-style XML files"),
 		OPT_END()
 	};
+	struct run_process_parallel_opts run_opts = {
+		.get_next_task = next_test,
+		.start_failure = test_failed,
+		.task_finished = test_finished,
+		.data = &suite,
+	};
 
 	argc = parse_options(argc, argv, NULL, options,
 			testsuite_usage, PARSE_OPT_STOP_AT_NON_OPTION);
@@ -181,9 +187,9 @@ static int testsuite(int argc, const char **argv)
 
 	fprintf(stderr, "Running %"PRIuMAX" tests (%d at a time)\n",
 		(uintmax_t)suite.tests.nr, max_jobs);
+	run_opts.jobs = max_jobs;
 
-	ret = run_processes_parallel(max_jobs, next_test, test_failed,
-				     test_finished, &suite);
+	ret = run_processes_parallel(&run_opts);
 
 	if (suite.failed.nr > 0) {
 		ret = 1;
@@ -373,6 +379,7 @@ int cmd__run_command(int argc, const char **argv)
 	int jobs;
 	get_next_task_fn next_fn = NULL;
 	task_finished_fn finished_fn = NULL;
+	struct run_process_parallel_opts opts = { 0 };
 
 	if (argc > 1 && !strcmp(argv[1], "testsuite"))
 		exit(testsuite(argc - 1, argv + 1));
@@ -412,6 +419,8 @@ int cmd__run_command(int argc, const char **argv)
 	jobs = atoi(argv[2]);
 	strvec_clear(&proc.args);
 	strvec_pushv(&proc.args, (const char **)argv + 3);
+	opts.jobs = jobs;
+	opts.data = &proc;
 
 	if (!strcmp(argv[1], "run-command-parallel")) {
 		next_fn = parallel_next;
@@ -426,5 +435,7 @@ int cmd__run_command(int argc, const char **argv)
 		return 1;
 	}
 
-	exit(run_processes_parallel(jobs, next_fn, NULL, finished_fn, &proc));
+	opts.get_next_task = next_fn;
+	opts.task_finished = finished_fn;
+	exit(run_processes_parallel(&opts));
 }

@@ -1533,13 +1533,14 @@ static void handle_children_on_signal(int signo)
 }
 
 static void pp_init(struct parallel_processes *pp,
-		    int n,
-		    get_next_task_fn get_next_task,
-		    start_failure_fn start_failure,
-		    task_finished_fn task_finished,
-		    void *data)
+		    struct run_process_parallel_opts *opts)
 {
 	int i;
+	int n = opts->jobs;
+	void *data = opts->data;
+	get_next_task_fn get_next_task = opts->get_next_task;
+	start_failure_fn start_failure = opts->start_failure;
+	task_finished_fn task_finished = opts->task_finished;
 
 	if (n < 1)
 		n = online_cpus();
@@ -1738,18 +1739,23 @@ static int pp_collect_finished(struct parallel_processes *pp)
 	return result;
 }
 
-int run_processes_parallel(int n,
-			   get_next_task_fn get_next_task,
-			   start_failure_fn start_failure,
-			   task_finished_fn task_finished,
-			   void *pp_cb)
+int run_processes_parallel(struct run_process_parallel_opts *opts)
 {
 	int i, code;
 	int output_timeout = 100;
 	int spawn_cap = 4;
 	struct parallel_processes pp;
+	const char *tr2_category = opts->tr2_category;
+	const char *tr2_label = opts->tr2_label;
+	const int do_trace2 = tr2_category && tr2_label;
+	const int n = opts->jobs;
 
-	pp_init(&pp, n, get_next_task, start_failure, task_finished, pp_cb);
+	if (do_trace2)
+		trace2_region_enter_printf(tr2_category, tr2_label, NULL,
+					   "max:%d", ((n < 1) ? online_cpus()
+						      : n));
+
+	pp_init(&pp, opts);
 	while (1) {
 		for (i = 0;
 		    i < spawn_cap && !pp.shutdown &&
@@ -1777,25 +1783,11 @@ int run_processes_parallel(int n,
 	}
 
 	pp_cleanup(&pp);
+
+	if (do_trace2)
+		trace2_region_leave(tr2_category, tr2_label, NULL);
+
 	return 0;
-}
-
-int run_processes_parallel_tr2(int n, get_next_task_fn get_next_task,
-			       start_failure_fn start_failure,
-			       task_finished_fn task_finished, void *pp_cb,
-			       const char *tr2_category, const char *tr2_label)
-{
-	int result;
-
-	trace2_region_enter_printf(tr2_category, tr2_label, NULL, "max:%d",
-				   ((n < 1) ? online_cpus() : n));
-
-	result = run_processes_parallel(n, get_next_task, start_failure,
-					task_finished, pp_cb);
-
-	trace2_region_leave(tr2_category, tr2_label, NULL);
-
-	return result;
 }
 
 int run_auto_maintenance(int quiet)
