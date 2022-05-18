@@ -1498,6 +1498,9 @@ struct parallel_processes {
 	int output_owner;
 	struct strbuf buffered_output; /* of finished children */
 };
+#define PARALLEL_PROCESSES_INIT { \
+	.buffered_output = STRBUF_INIT, \
+}
 
 static int default_start_failure(struct strbuf *out,
 				 void *pp_cb,
@@ -1562,7 +1565,6 @@ static void pp_init(struct parallel_processes *pp,
 	pp->shutdown = 0;
 	CALLOC_ARRAY(pp->children, n);
 	CALLOC_ARRAY(pp->pfd, n);
-	strbuf_init(&pp->buffered_output, 0);
 
 	for (i = 0; i < n; i++) {
 		strbuf_init(&pp->children[i].err, 0);
@@ -1744,7 +1746,7 @@ int run_processes_parallel(struct run_process_parallel_opts *opts)
 	int i, code;
 	int output_timeout = 100;
 	int spawn_cap = 4;
-	struct parallel_processes pp;
+	struct parallel_processes pp = PARALLEL_PROCESSES_INIT;
 	const char *tr2_category = opts->tr2_category;
 	const char *tr2_label = opts->tr2_label;
 	const int do_trace2 = tr2_category && tr2_label;
