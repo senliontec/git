@@ -31,7 +31,11 @@ static int parallel_next(struct child_process *cp,
 		return 0;
 
 	strvec_pushv(&cp->args, d->args.v);
-	strbuf_addstr(err, "preloaded output of a child\n");
+	if (err)
+		strbuf_addstr(err, "preloaded output of a child\n");
+	else
+		fprintf(stderr, "preloaded output of a child\n");
+
 	number_callbacks++;
 	return 1;
 }
@@ -41,7 +45,10 @@ static int no_job(struct child_process *cp,
 		  void *cb,
 		  void **task_cb)
 {
-	strbuf_addstr(err, "no further jobs available\n");
+	if (err)
+		strbuf_addstr(err, "no further jobs available\n");
+	else
+		fprintf(stderr, "no further jobs available\n");
 	return 0;
 }
 
@@ -50,7 +57,10 @@ static int task_finished(int result,
 			 void *pp_cb,
 			 void *pp_task_cb)
 {
-	strbuf_addstr(err, "asking for a quick stop\n");
+	if (err)
+		strbuf_addstr(err, "asking for a quick stop\n");
+	else
+		fprintf(stderr, "asking for a quick stop\n");
 	return 1;
 }
 
@@ -422,12 +432,15 @@ int cmd__run_command(int argc, const char **argv)
 	opts.jobs = jobs;
 	opts.data = &proc;
 
-	if (!strcmp(argv[1], "run-command-parallel")) {
+	if (!strcmp(argv[1], "run-command-parallel") ||
+	    !strcmp(argv[1], "run-command-parallel-ungroup")) {
 		next_fn = parallel_next;
-	} else if (!strcmp(argv[1], "run-command-abort")) {
+	} else if (!strcmp(argv[1], "run-command-abort") ||
+		   !strcmp(argv[1], "run-command-abort-ungroup")) {
 		next_fn = parallel_next;
 		finished_fn = task_finished;
-	} else if (!strcmp(argv[1], "run-command-no-jobs")) {
+	} else if (!strcmp(argv[1], "run-command-no-jobs") ||
+		   !strcmp(argv[1], "run-command-no-jobs-ungroup")) {
 		next_fn = no_job;
 		finished_fn = task_finished;
 	} else {
@@ -435,6 +448,7 @@ int cmd__run_command(int argc, const char **argv)
 		return 1;
 	}
 
+	opts.ungroup = ends_with(argv[1], "-ungroup");
 	opts.get_next_task = next_fn;
 	opts.task_finished = finished_fn;
 	exit(run_processes_parallel(&opts));
