@@ -371,6 +371,8 @@ int cmd__run_command(int argc, const char **argv)
 {
 	struct child_process proc = CHILD_PROCESS_INIT;
 	int jobs;
+	get_next_task_fn next_fn = NULL;
+	task_finished_fn finished_fn = NULL;
 
 	if (argc > 1 && !strcmp(argv[1], "testsuite"))
 		exit(testsuite(argc - 1, argv + 1));
@@ -411,18 +413,18 @@ int cmd__run_command(int argc, const char **argv)
 	strvec_clear(&proc.args);
 	strvec_pushv(&proc.args, (const char **)argv + 3);
 
-	if (!strcmp(argv[1], "run-command-parallel"))
-		exit(run_processes_parallel(jobs, parallel_next,
-					    NULL, NULL, &proc));
+	if (!strcmp(argv[1], "run-command-parallel")) {
+		next_fn = parallel_next;
+	} else if (!strcmp(argv[1], "run-command-abort")) {
+		next_fn = parallel_next;
+		finished_fn = task_finished;
+	} else if (!strcmp(argv[1], "run-command-no-jobs")) {
+		next_fn = no_job;
+		finished_fn = task_finished;
+	} else {
+		fprintf(stderr, "check usage\n");
+		return 1;
+	}
 
-	if (!strcmp(argv[1], "run-command-abort"))
-		exit(run_processes_parallel(jobs, parallel_next,
-					    NULL, task_finished, &proc));
-
-	if (!strcmp(argv[1], "run-command-no-jobs"))
-		exit(run_processes_parallel(jobs, no_job,
-					    NULL, task_finished, &proc));
-
-	fprintf(stderr, "check usage\n");
-	return 1;
+	exit(run_processes_parallel(jobs, next_fn, NULL, finished_fn, &proc));
 }
